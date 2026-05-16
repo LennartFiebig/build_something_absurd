@@ -32,22 +32,23 @@
   </section>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
 const $ = (id) => document.getElementById(id);
 
-socket.emit('admin:join');
+async function api(path) {
+  const res = await fetch(path, { method: 'POST' });
+  return res.json();
+}
 
-$('start').addEventListener('click', () => socket.emit('admin:start'));
-$('next').addEventListener('click', () => socket.emit('admin:next'));
+$('start').addEventListener('click', () => api('/api/admin/start').then(poll));
+$('next').addEventListener('click', () => api('/api/admin/next').then(poll));
 $('reset').addEventListener('click', () => {
   if (confirm('Spiel wirklich zurücksetzen? Alle Spieler werden entfernt.')) {
-    socket.emit('admin:reset');
+    api('/api/admin/reset').then(poll);
   }
 });
 
-socket.on('admin:state', (s) => {
+function render(s) {
   $('phase').textContent = ({
     lobby: 'Lobby',
     question: 'Frage läuft',
@@ -90,7 +91,25 @@ socket.on('admin:state', (s) => {
   if (s.players.length === 0) {
     lb.innerHTML = '<li class="empty">Noch keine Spieler.</li>';
   }
-});
+}
+
+let inflight = false;
+async function poll() {
+  if (inflight) return;
+  inflight = true;
+  try {
+    const res = await fetch('/api/state', { cache: 'no-store' });
+    const state = await res.json();
+    render(state);
+  } catch (e) {
+    // ignore
+  } finally {
+    inflight = false;
+  }
+}
+
+poll();
+setInterval(poll, 1000);
 </script>
 </body>
 </html>
