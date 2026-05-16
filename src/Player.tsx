@@ -27,19 +27,41 @@ function saveStored(s: Stored | null) {
 
 export function Player() {
   const [stored, setStored] = useState<Stored | null>(() => loadStored())
-  const { state, error } = useGame(stored?.id ?? null)
+  const { state, fetchedForPlayerId, error } = useGame(stored?.id ?? null)
 
   // If the server doesn't know our player anymore (e.g. after a reset),
-  // drop the stored id so we re-join.
+  // drop the stored id so we re-join. Only act on responses that were
+  // actually fetched with our current id, otherwise we'd wipe a freshly
+  // stored id before the next poll cycle confirms the server has us.
   useEffect(() => {
     if (!stored || !state) return
+    if (fetchedForPlayerId !== stored.id) return
     if (state.me) return
     setStored(null)
     saveStored(null)
-  }, [stored, state])
+  }, [stored, state, fetchedForPlayerId])
 
-  if (!stored || !state?.me) {
-    return <JoinScreen onJoin={(s) => { setStored(s); saveStored(s) }} disabled={state?.phase !== 'lobby'} />
+  if (!stored) {
+    return (
+      <JoinScreen
+        onJoin={(s) => { setStored(s); saveStored(s) }}
+        disabled={state != null && state.phase !== 'lobby'}
+      />
+    )
+  }
+
+  // We have a stored id but the server hasn't confirmed it yet — show a
+  // brief waiting state instead of bouncing back to JoinScreen.
+  if (!state || fetchedForPlayerId !== stored.id || !state.me) {
+    return (
+      <div className="join">
+        <div className="join__card">
+          <h1>Burghausen<span>Guessr</span></h1>
+          <p className="join__hint">Verbinde dich…</p>
+          {error && <p className="join__err">{error}</p>}
+        </div>
+      </div>
+    )
   }
 
   return <PlayScreen state={state} playerId={stored.id} error={error} />
