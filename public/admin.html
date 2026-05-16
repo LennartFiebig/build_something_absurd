@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Quiz – Admin</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body class="admin">
+<div id="app">
+  <header class="admin-header">
+    <h1>Admin</h1>
+    <div class="phase">Phase: <strong id="phase">–</strong></div>
+  </header>
+
+  <section class="card">
+    <h2 id="qheading">Lobby</h2>
+    <div id="question-box" class="hidden">
+      <p id="qtext"></p>
+      <ol id="answers"></ol>
+    </div>
+    <div class="controls">
+      <button id="start" disabled>Quiz starten</button>
+      <button id="next" disabled>Auflösen / Nächste Frage</button>
+      <button id="reset" class="ghost">Reset</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Leaderboard</h2>
+    <ol id="leaderboard" class="big-board"></ol>
+  </section>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const $ = (id) => document.getElementById(id);
+
+socket.emit('admin:join');
+
+$('start').addEventListener('click', () => socket.emit('admin:start'));
+$('next').addEventListener('click', () => socket.emit('admin:next'));
+$('reset').addEventListener('click', () => {
+  if (confirm('Spiel wirklich zurücksetzen? Alle Spieler werden entfernt.')) {
+    socket.emit('admin:reset');
+  }
+});
+
+socket.on('admin:state', (s) => {
+  $('phase').textContent = ({
+    lobby: 'Lobby',
+    question: 'Frage läuft',
+    reveal: 'Auflösung',
+    finished: 'Beendet',
+  })[s.phase] || s.phase;
+
+  $('start').disabled = !(s.phase === 'lobby' && s.players.length > 0);
+  $('next').disabled = !(s.phase === 'question' || s.phase === 'reveal');
+
+  if (s.phase === 'lobby') {
+    $('qheading').textContent = `Lobby – ${s.players.length} Spieler`;
+    $('question-box').classList.add('hidden');
+  } else if (s.phase === 'finished') {
+    $('qheading').textContent = 'Quiz beendet';
+    $('question-box').classList.add('hidden');
+  } else if (s.question) {
+    $('qheading').textContent = `Frage ${s.currentQuestion + 1} / ${s.totalQuestions}`;
+    $('question-box').classList.remove('hidden');
+    $('qtext').textContent = s.question.question;
+    const ol = $('answers');
+    ol.innerHTML = '';
+    s.question.answers.forEach((a, i) => {
+      const li = document.createElement('li');
+      li.textContent = a;
+      if (s.phase === 'reveal' && i === s.question.correct) li.classList.add('correct');
+      ol.appendChild(li);
+    });
+  }
+
+  const lb = $('leaderboard');
+  lb.innerHTML = '';
+  s.players.forEach((p, i) => {
+    const li = document.createElement('li');
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+    const ans = s.phase === 'question' ? (p.answered ? ' ✔' : ' …') : '';
+    li.innerHTML = `<span class="rank">${medal}</span><span class="name">${p.name}${ans}</span><strong>${p.score}</strong>`;
+    lb.appendChild(li);
+  });
+  if (s.players.length === 0) {
+    lb.innerHTML = '<li class="empty">Noch keine Spieler.</li>';
+  }
+});
+</script>
+</body>
+</html>
