@@ -34,7 +34,7 @@ module.exports = async function handler(req, res) {
   }
 
   const id = crypto.randomUUID();
-  state.players[id] = { name, score: 0, answered: false };
+  state.players[id] = { name, answered: false, lastPoints: 0, lastCorrect: null };
   await setState(state);
 
   res.status(200).json({ ok: true, playerId: id, name });

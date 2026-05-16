@@ -1,4 +1,5 @@
-const KEY = 'kahoot:state';
+const STATE_KEY = 'kahoot:state';
+const SCORES_KEY = 'kahoot:scores';
 
 const QUESTIONS = [
   {
@@ -22,10 +23,12 @@ const QUESTIONS = [
 ];
 
 async function redis(args) {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
   if (!url || !token) {
-    throw new Error('Missing UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN');
+    throw new Error(
+      'Missing Redis env vars (UPSTASH_REDIS_REST_URL/TOKEN or KV_REST_API_URL/TOKEN)'
+    );
   }
   const res = await fetch(url, {
     method: 'POST',
@@ -50,7 +53,7 @@ function initialState() {
 }
 
 async function getState() {
-  const raw = await redis(['GET', KEY]);
+  const raw = await redis(['GET', STATE_KEY]);
   if (!raw) return initialState();
   try {
     return JSON.parse(raw);
@@ -60,12 +63,40 @@ async function getState() {
 }
 
 async function setState(s) {
-  await redis(['SET', KEY, JSON.stringify(s)]);
+  await redis(['SET', STATE_KEY, JSON.stringify(s)]);
 }
 
-function publicPlayers(state) {
-  return Object.values(state.players)
-    .map((p) => ({ name: p.name, score: p.score, answered: p.answered }))
+async function getScores() {
+  const result = await redis(['HGETALL', SCORES_KEY]);
+  if (!result) return {};
+  if (Array.isArray(result)) {
+    const obj = {};
+    for (let i = 0; i < result.length; i += 2) {
+      obj[result[i]] = Number(result[i + 1]) || 0;
+    }
+    return obj;
+  }
+  const obj = {};
+  for (const [k, v] of Object.entries(result)) obj[k] = Number(v) || 0;
+  return obj;
+}
+
+async function incrScore(playerId, by) {
+  if (!by) return;
+  await redis(['HINCRBY', SCORES_KEY, playerId, String(by)]);
+}
+
+async function resetScores() {
+  await redis(['DEL', SCORES_KEY]);
+}
+
+function publicPlayers(state, scores) {
+  return Object.entries(state.players)
+    .map(([id, p]) => ({
+      name: p.name,
+      score: scores[id] || 0,
+      answered: !!p.answered,
+    }))
     .sort((a, b) => b.score - a.score);
 }
 
@@ -106,6 +137,8 @@ function startQuestion(state, index) {
   state.questionStartedAt = Date.now();
   for (const id of Object.keys(state.players)) {
     state.players[id].answered = false;
+    state.players[id].lastPoints = 0;
+    state.players[id].lastCorrect = null;
   }
   return state;
 }
@@ -116,7 +149,12 @@ function methodNotAllowed(req, res, allowed) {
 }
 
 async function readBody(req) {
-  if (req.body && typeof req.body === 'object') return req.body;
+  if (req.body) {
+    if (typeof req.body === 'object') return req.body;
+    if (typeof req.body === 'string') {
+      try { return JSON.parse(req.body); } catch { return {}; }
+    }
+  }
   return new Promise((resolve, reject) => {
     let data = '';
     req.on('data', (c) => (data += c));
@@ -137,6 +175,9 @@ module.exports = {
   getState,
   setState,
   initialState,
+  getScores,
+  incrScore,
+  resetScores,
   publicPlayers,
   publicQuestion,
   maybeAutoReveal,

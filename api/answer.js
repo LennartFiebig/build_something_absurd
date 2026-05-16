@@ -2,6 +2,7 @@ const {
   QUESTIONS,
   getState,
   setState,
+  incrScore,
   maybeAutoReveal,
   methodNotAllowed,
   readBody,
@@ -37,15 +38,18 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'Ungültige Antwort.' });
   }
 
-  player.answered = true;
   const elapsed = Date.now() - state.questionStartedAt;
   const correct = choice === q.correct;
   let points = 0;
   if (correct) {
     const ratio = Math.max(0, 1 - elapsed / q.timeMs);
     points = Math.round(500 + 500 * ratio);
-    player.score += points;
+    await incrScore(playerId, points);
   }
+
+  player.answered = true;
+  player.lastPoints = points;
+  player.lastCorrect = correct;
 
   const allAnswered =
     Object.keys(state.players).length > 0 &&

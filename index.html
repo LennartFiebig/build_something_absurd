@@ -37,6 +37,7 @@
 
   <section id="reveal" class="card hidden">
     <h2 id="reveal-title">Auflösung</h2>
+    <div id="reveal-banner" class="reveal-banner neutral">–</div>
     <p id="reveal-points"></p>
     <h3>Leaderboard</h3>
     <ol id="leaderboard"></ol>
@@ -133,6 +134,17 @@ function renderQuestion(state) {
 function renderReveal(state) {
   if (timerInterval) clearInterval(timerInterval);
   const me = state.me;
+  const banner = $('reveal-banner');
+  if (me && me.lastCorrect === true) {
+    banner.className = 'reveal-banner correct';
+    banner.textContent = `Richtig! +${me.lastPoints} Punkte`;
+  } else if (me && me.lastCorrect === false) {
+    banner.className = 'reveal-banner wrong';
+    banner.textContent = 'Leider falsch.';
+  } else {
+    banner.className = 'reveal-banner neutral';
+    banner.textContent = 'Keine Antwort abgegeben.';
+  }
   $('reveal-points').textContent = me ? `Dein Punktestand: ${me.score}` : '';
   const ol = $('leaderboard');
   ol.innerHTML = '';

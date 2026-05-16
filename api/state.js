@@ -1,5 +1,6 @@
 const {
   getState,
+  getScores,
   publicPlayers,
   publicQuestion,
   maybeAutoReveal,
@@ -11,14 +12,18 @@ module.exports = async function handler(req, res) {
 
   let state = await getState();
   state = await maybeAutoReveal(state);
+  const scores = await getScores();
 
   const playerId = req.query?.playerId || '';
-  const me = state.players[playerId]
+  const meEntry = state.players[playerId];
+  const me = meEntry
     ? {
         id: playerId,
-        name: state.players[playerId].name,
-        score: state.players[playerId].score,
-        answered: state.players[playerId].answered,
+        name: meEntry.name,
+        score: scores[playerId] || 0,
+        answered: !!meEntry.answered,
+        lastPoints: meEntry.lastPoints || 0,
+        lastCorrect: typeof meEntry.lastCorrect === 'boolean' ? meEntry.lastCorrect : null,
       }
     : null;
 
@@ -29,7 +34,7 @@ module.exports = async function handler(req, res) {
     totalQuestions: 3,
     questionStartedAt: state.questionStartedAt,
     question: publicQuestion(state),
-    players: publicPlayers(state),
+    players: publicPlayers(state, scores),
     me,
   });
 };
