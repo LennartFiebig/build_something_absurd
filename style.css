@@ -69,9 +69,27 @@ button.ghost { background: transparent; color: inherit; border: 1px solid curren
   align-items: center;
   padding: 10px 14px;
   background: #f3f4f6;
+  color: #1c1c1e;
   border-radius: 10px;
 }
-#leaderboard li.me, #final-leaderboard li.me { background: #fef3c7; }
+#leaderboard li.me, #final-leaderboard li.me { background: #fef3c7; color: #1c1c1e; }
+
+/* Admin uses both #leaderboard and .big-board; let big-board win. */
+body.admin #leaderboard li {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+.reveal-banner {
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.reveal-banner.correct { background: #10b981; color: #fff; }
+.reveal-banner.wrong { background: #ef4444; color: #fff; }
+.reveal-banner.neutral { background: #e5e7eb; color: #1c1c1e; }
 
 .qheader {
   display: flex;
