@@ -116,6 +116,21 @@ body {
   background: #000;
 }
 
+.location-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.location-view__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .guess-map {
   cursor: crosshair;
 }
