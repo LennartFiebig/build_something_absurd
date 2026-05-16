@@ -1,30 +1,24 @@
-# Kahoot Clone
+# BurghausenGuessr
 
-Kleines Quiz mit drei Fragen. Spieler tragen ihren Vornamen ein, beantworten gleichzeitig die Fragen, der Admin sieht das Live-Leaderboard.
-
-Architektur: Vercel Serverless Functions (`api/*`) + Upstash Redis als State Store. Clients pollen `GET /api/state` jede Sekunde.
-
-## Deployment auf Vercel
-
-1. **Upstash Redis** anlegen (kostenlos):
-   - Im Vercel-Dashboard → Storage → Marketplace → **Upstash for Redis** → mit dem Projekt verknüpfen. `UPSTASH_REDIS_REST_URL` und `UPSTASH_REDIS_REST_TOKEN` werden dann automatisch als Env-Vars gesetzt.
-   - Alternativ direkt bei https://upstash.com einen Store erstellen und beide Werte unter Vercel → Project → Settings → Environment Variables eintragen.
-
-2. **Deployen:**
-   ```
-   npx vercel
-   npx vercel --prod
-   ```
+Multiplayer GeoGuessr-Klon für Burghausen. Spieler:innen sehen ein Foto und setzen einen Pin auf die Karte; alle tippen gleichzeitig, nach jeder Runde gibt es Punkte und ein Leaderboard.
 
 ## Routen
 
-- `/` – Spieler-View
-- `/admin.html` – Admin-View
+- `/` — Spieleransicht (mitspielen)
+- `/admin` — Hostansicht (Spiel starten, Runden auflösen, zurücksetzen)
 
-## Lokal testen
+## Lokal entwickeln
 
+```bash
+npm install
+npm run dev          # Vite-Frontend (nur Mockup ohne Backend)
+# oder mit API:
+vercel dev           # Frontend + Serverless-API mit Redis
 ```
-npx vercel link
-npx vercel env pull .env.local
-npx vercel dev
-```
+
+`vercel dev` braucht `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
+(oder `KV_REST_API_URL` / `KV_REST_API_TOKEN`) als Env-Variablen.
+
+## Deployment
+
+Vercel-Projekt — `vercel --prod`. Env-Variablen siehe oben.

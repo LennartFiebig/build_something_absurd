@@ -1,11 +1,13 @@
-const {
+import {
+  LOCATIONS,
   getState,
   setState,
-  startQuestion,
+  startRound,
+  shuffle,
   methodNotAllowed,
-} = require('../_lib/state');
+} from '../_lib/state.js';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(req, res, ['POST']);
 
   const state = await getState();
@@ -16,7 +18,8 @@ module.exports = async function handler(req, res) {
     return res.status(409).json({ ok: false, error: 'Noch keine Spieler.' });
   }
 
-  startQuestion(state, 0);
+  state.roundOrder = shuffle(LOCATIONS.map((l) => l.id));
+  startRound(state, 0);
   await setState(state);
   res.status(200).json({ ok: true });
-};
+}

@@ -1,16 +1,14 @@
-const {
+import {
   getState,
   publicPlayers,
-  publicQuestion,
-  maybeAutoReveal,
+  publicRound,
   methodNotAllowed,
-} = require('./_lib/state');
+} from './_lib/state.js';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'GET') return methodNotAllowed(req, res, ['GET']);
 
-  let state = await getState();
-  state = await maybeAutoReveal(state);
+  const state = await getState();
 
   const playerId = req.query?.playerId || '';
   const me = state.players[playerId]
@@ -18,18 +16,18 @@ module.exports = async function handler(req, res) {
         id: playerId,
         name: state.players[playerId].name,
         score: state.players[playerId].score,
-        answered: state.players[playerId].answered,
+        submitted: state.players[playerId].submitted,
+        guess: state.players[playerId].guess,
+        lastPoints: state.players[playerId].lastPoints,
+        lastDistance: state.players[playerId].lastDistance,
       }
     : null;
 
   res.setHeader('Cache-Control', 'no-store');
   res.status(200).json({
     phase: state.phase,
-    currentQuestion: state.currentQuestion,
-    totalQuestions: 3,
-    questionStartedAt: state.questionStartedAt,
-    question: publicQuestion(state),
+    round: publicRound(state),
     players: publicPlayers(state),
     me,
   });
-};
+}

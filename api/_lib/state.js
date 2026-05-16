@@ -1,29 +1,15 @@
-const KEY = 'kahoot:state';
+import { LOCATIONS } from './locations.js';
 
-const QUESTIONS = [
-  {
-    question: 'Welche Stadt ist die Hauptstadt von Australien?',
-    answers: ['Sydney', 'Melbourne', 'Canberra', 'Perth'],
-    correct: 2,
-    timeMs: 15000,
-  },
-  {
-    question: 'Wie viele Planeten hat unser Sonnensystem?',
-    answers: ['7', '8', '9', '10'],
-    correct: 1,
-    timeMs: 15000,
-  },
-  {
-    question: 'Welches Element hat das Symbol "Au"?',
-    answers: ['Silber', 'Aluminium', 'Argon', 'Gold'],
-    correct: 3,
-    timeMs: 15000,
-  },
-];
+const KEY = 'geoguessr:state';
+
+function pickRedisCreds() {
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  return { url, token };
+}
 
 async function redis(args) {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const { url, token } = pickRedisCreds();
   if (!url || !token) {
     throw new Error('Missing UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN');
   }
@@ -40,16 +26,26 @@ async function redis(args) {
   return j.result;
 }
 
-function initialState() {
+export function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export function initialState() {
   return {
     phase: 'lobby',
-    currentQuestion: -1,
-    questionStartedAt: 0,
+    currentRound: -1,
+    roundOrder: [],
+    roundStartedAt: 0,
     players: {},
   };
 }
 
-async function getState() {
+export async function getState() {
   const raw = await redis(['GET', KEY]);
   if (!raw) return initialState();
   try {
@@ -59,63 +55,65 @@ async function getState() {
   }
 }
 
-async function setState(s) {
+export async function setState(s) {
   await redis(['SET', KEY, JSON.stringify(s)]);
 }
 
-function publicPlayers(state) {
+export function currentLocation(state) {
+  if (state.currentRound < 0) return null;
+  const id = state.roundOrder[state.currentRound];
+  return LOCATIONS.find((l) => l.id === id) || null;
+}
+
+export function publicPlayers(state) {
   return Object.values(state.players)
-    .map((p) => ({ name: p.name, score: p.score, answered: p.answered }))
+    .map((p) => ({
+      name: p.name,
+      score: p.score,
+      submitted: p.submitted,
+      lastPoints: p.lastPoints,
+      lastDistance: p.lastDistance,
+      lastGuess: p.guess,
+    }))
     .sort((a, b) => b.score - a.score);
 }
 
-function publicQuestion(state) {
-  if (state.currentQuestion < 0) return null;
-  const q = QUESTIONS[state.currentQuestion];
-  if (!q) return null;
+export function publicRound(state) {
+  const loc = currentLocation(state);
+  if (!loc) return null;
   const reveal = state.phase === 'reveal' || state.phase === 'finished';
   return {
-    index: state.currentQuestion,
-    total: QUESTIONS.length,
-    question: q.question,
-    answers: q.answers,
-    timeMs: q.timeMs,
-    startedAt: state.questionStartedAt,
-    correct: reveal ? q.correct : null,
+    index: state.currentRound,
+    total: state.roundOrder.length,
+    image: loc.image,
+    startedAt: state.roundStartedAt,
+    truth: reveal ? { lat: loc.lat, lng: loc.lng, name: loc.name } : null,
   };
 }
 
-async function maybeAutoReveal(state) {
-  if (state.phase !== 'question') return state;
-  const q = QUESTIONS[state.currentQuestion];
-  if (!q) return state;
-  if (Date.now() - state.questionStartedAt > q.timeMs + 300) {
-    state.phase = 'reveal';
-    await setState(state);
-  }
-  return state;
-}
-
-function startQuestion(state, index) {
-  if (index >= QUESTIONS.length) {
+export function startRound(state, index) {
+  if (index >= state.roundOrder.length) {
     state.phase = 'finished';
     return state;
   }
-  state.phase = 'question';
-  state.currentQuestion = index;
-  state.questionStartedAt = Date.now();
+  state.phase = 'round';
+  state.currentRound = index;
+  state.roundStartedAt = Date.now();
   for (const id of Object.keys(state.players)) {
-    state.players[id].answered = false;
+    state.players[id].submitted = false;
+    state.players[id].guess = null;
+    state.players[id].lastPoints = 0;
+    state.players[id].lastDistance = null;
   }
   return state;
 }
 
-function methodNotAllowed(req, res, allowed) {
+export function methodNotAllowed(req, res, allowed) {
   res.setHeader('Allow', allowed.join(', '));
   res.status(405).json({ error: 'Method not allowed' });
 }
 
-async function readBody(req) {
+export async function readBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   return new Promise((resolve, reject) => {
     let data = '';
@@ -132,15 +130,4 @@ async function readBody(req) {
   });
 }
 
-module.exports = {
-  QUESTIONS,
-  getState,
-  setState,
-  initialState,
-  publicPlayers,
-  publicQuestion,
-  maybeAutoReveal,
-  startQuestion,
-  methodNotAllowed,
-  readBody,
-};
+export { LOCATIONS };

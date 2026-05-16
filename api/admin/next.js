@@ -1,32 +1,31 @@
-const {
-  QUESTIONS,
+import {
   getState,
   setState,
-  startQuestion,
+  startRound,
   methodNotAllowed,
-} = require('../_lib/state');
+} from '../_lib/state.js';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(req, res, ['POST']);
 
   const state = await getState();
 
-  if (state.phase === 'question') {
+  if (state.phase === 'round') {
     state.phase = 'reveal';
     await setState(state);
     return res.status(200).json({ ok: true, phase: 'reveal' });
   }
 
   if (state.phase === 'reveal') {
-    const next = state.currentQuestion + 1;
-    if (next >= QUESTIONS.length) {
+    const next = state.currentRound + 1;
+    if (next >= state.roundOrder.length) {
       state.phase = 'finished';
     } else {
-      startQuestion(state, next);
+      startRound(state, next);
     }
     await setState(state);
     return res.status(200).json({ ok: true, phase: state.phase });
   }
 
   res.status(409).json({ ok: false, error: 'Aktion nicht erlaubt im aktuellen Status.' });
-};
+}
